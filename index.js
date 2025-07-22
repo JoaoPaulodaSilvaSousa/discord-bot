@@ -14,7 +14,7 @@ const { token } = require('./config.json');
 const cron = require('node-cron');
 
 // Create a new client instance
-const client = new Client({ intents: [GatewayIntentBits.Guilds] }); //Você está criando seu bot (client) com o "intenção" de usar apenas servidores (Guilds). Se quiser que o bot reaja a mensagens, reações, etc., precisaria adicionar mais intents.
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] }); //Você está criando seu bot (client) com o "intenção" de usar apenas servidores (Guilds). Se quiser que o bot reaja a mensagens, reações, etc., precisaria adicionar mais intents.
 
 
 client.commands = new Collection(); //Aqui você está criando uma lista especial para guardar todos os comandos que o bot pode usar.
@@ -54,6 +54,13 @@ for (const file of eventFiles) {
 
 const jobs = require('./jobs');
 jobs(client, config); //Executa essa função passando client e config como argumentos:
+
+
+
+const SomaDosPacotes = require('./SomaDosPacotes');
+SomaDosPacotes(client);
+
+
 
 // Log in to Discord with your client's token
 client.login(token);
