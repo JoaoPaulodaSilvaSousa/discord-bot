@@ -1,7 +1,11 @@
 const cron = require('node-cron');
 const UltimosDados = {};    // Guarda o último conteúdo válido por canal
 
-module.exports = function SomaDosPacotes(client) {
+
+module.exports = function SomaDosPacotes(client, config) {
+
+    const { postagemHora, postagemMinuto } = config;
+
     client.on('messageCreate', async (message) => {
         if (message.author.bot) return;
 
@@ -56,89 +60,66 @@ module.exports = function SomaDosPacotes(client) {
 
         if (partes.length > 0) {
             // Monta a resposta formatada
-            let titulo = 'PLACE';
             const tituloMatch = message.content.match(/^([^\s:]+)\s*:/);
-            if (tituloMatch) {
-                titulo = tituloMatch[1].toUpperCase();
+            if (!tituloMatch || tituloMatch[1].toUpperCase() !== 'PLACE') {
+                console.log(`Mensagem sem título válido no canal ${message.channel.id}: "${message.content}". Use o título correto para a validação.`)
+                return // Sai da função após logar
             }
+                 
+                
+            const titulo = tituloMatch[1].toUpperCase();
+
+            if (titulo !== 'PLACE') return; // Só continua se o título for PLACE
+            
 
             const resposta = `*${titulo}: ${partes.join(' | ')}*\n*TOTAL ${titulo} = ${total}*`;
 
-            UltimosDados[message.channel.id] = {
-                resposta: resposta,
-                mensagemId: UltimosDados[message.channel.id]?.mensagemId || null
-            }; //Essa sintaxe com colchetes [] é a forma de acessar (ou definir) uma propriedade de um objeto dinamicamente, ou seja, com uma variável.
+            UltimosDados[message.channel.id] = { //Essa sintaxe com colchetes [] é a forma de acessar (ou definir) uma propriedade de um objeto dinamicamente, ou seja, com uma variável.
+                resposta: resposta
+            };
 
             // Opcional: log para verificar que armazenou
             console.log(`Armazenado para canal ${message.channel.id}: ${resposta}`);
-
-
-            // Se já temos info anterior, só atualiza a resposta
-            const canalId = message.channel.id;
-
-
-            // Se já enviou uma mensagem antes, edita ela
-            if (UltimosDados[canalId].mensagemId) {
-                try {
-                    const canal = await client.channels.fetch(canalId);
-                    const msg = await canal.messages.fetch(UltimosDados[canalId].mensagemId);
-
-                    await msg.edit(UltimosDados[canalId].resposta); // Atualiza a antiga
-                    // Envia uma nova no final do chat (visível)
-        const novaMsg = await message.channel.send(UltimosDados[canalId].resposta);
-
-        // Aguarda 1 minuto (60000 ms) e deleta a nova mensagem
-        setTimeout(() => {
-            novaMsg.delete().catch(console.error);
-        }, 1000);
-
-
-
-                } catch (error) {
-                    console.log('Erro ao editar mensagem:', error);
-                    // Se der erro, enviar uma nova mensagem (ex: mensagem deletada)
-                    const sentMsg = await message.channel.send(resposta);
-                    UltimosDados[canalId].mensagemId = sentMsg.id;
-
-                    // Também apaga a mensagem enviada no fallback
-        setTimeout(() => {
-            sentMsg.delete().catch(console.error);
-        }, 60000);
-
-        UltimosDados[canalId].mensagemId = sentMsg.id;
-                }
-            } else {
-                // Se ainda não enviou mensagem, envia e salva ID
-                const sentMsg = await message.channel.send(resposta);
-                UltimosDados[canalId].mensagemId = sentMsg.id;
-                console.log(`Mensagem enviada no canal ${canalId}`);
-            }
         }
     });
 
-    cron.schedule('* * * * *', async () => {
-        console.log(`Executando envio de pacote às ...`)
+    // Agenda o cron com a hora e minuto configurado
 
-        for (const canalId in UltimosDados) {
+    let minutoAgendado = Number(postagemMinuto) + 1;
+    let horaAgendada = Number(postagemHora);
+
+    if( minutoAgendado >= 60) {
+        minutoAgendado = 0;
+        horaAgendada += 1;
+        if (horaAgendada >= 24) horaAgendada = 0;
+    }
+
+    const expressaoCron = `${minutoAgendado} ${horaAgendada} * * *`;
+    console.log(`Expressão cron configurada: ${expressaoCron}`);
+
+
+    cron.schedule(expressaoCron, async () => {
+        console.log(`Executando envio de pacote Place às ${horaAgendada}:${minutoAgendado.toString().padStart(2, '0')}`);
+
+        const canaisComDados = Object.keys(UltimosDados).filter(canalId => {
+            return UltimosDados[canalId] && UltimosDados[canalId].resposta;
+        });
+
+        if (canaisComDados.length === 0) {
+            console.log(`Nenhuma mensagem foi enviada. Nenhum dado registrado no período.`);
+            return
+        }
+
+        for (const canalId of canaisComDados) {
             const canal = await client.channels.fetch(canalId);
             if (!canal) continue;
 
             const dado = UltimosDados[canalId];
-            if (!dado || !dado.resposta) continue;
-
-            const { mensagemId, resposta } = dado;
-
             try {
-                if (mensagemId) {
-                    const msg = await canal.messages.fetch(mensagemId);
-                    await msg.edit(resposta);
-                    console.log(`Mensagem atualizada no canal ${canalId}`);
-                } else {
-                    const novaMsg = await canal.send(resposta);
-                    UltimosDados[canalId].mensagemId = novaMsg.id;
-                }
+                await canal.send(dado.resposta);
+                console.log(`Mensagem enviada no canal ${canalId}`);
             } catch (error) {
-                console.log(`Erro ao atualizar canal ${canalId}:`, error)
+                console.log(`Erro ao enviar mensagem no canal ${canalId}:`, error)
             }
         }
 

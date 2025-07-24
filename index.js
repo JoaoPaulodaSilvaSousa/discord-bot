@@ -56,9 +56,9 @@ const jobs = require('./jobs');
 jobs(client, config); //Executa essa função passando client e config como argumentos:
 
 
-
-const SomaDosPacotes = require('./SomaDosPacotes');
-SomaDosPacotes(client);
+const configHorario = require('./configHorario.json');
+const SomaDosPacotes = require('./somadospacotes');
+SomaDosPacotes(client, configHorario);
 
 
 
