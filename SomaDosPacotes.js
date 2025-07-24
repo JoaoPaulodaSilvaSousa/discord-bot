@@ -4,7 +4,7 @@ const UltimosDados = {};    // Guarda o último conteúdo válido por canal
 
 module.exports = function SomaDosPacotes(client, config) {
 
-    const { postagemHora, postagemMinuto } = config;
+    const { corteHora, corteMinuto } = config;
 
     client.on('messageCreate', async (message) => {
         if (message.author.bot) return;
@@ -62,7 +62,7 @@ module.exports = function SomaDosPacotes(client, config) {
             // Monta a resposta formatada
             const tituloMatch = message.content.match(/^([^\s:]+)\s*:/);
             if (!tituloMatch || tituloMatch[1].toUpperCase() !== 'PLACE') {
-                console.log(`Mensagem sem título válido no canal ${message.channel.id}: "${message.content}". Use o título correto para a validação.`)
+                console.log(`Mensagem sem título inválido no canal ${message.channel.id}: "${message.content}". Use o título correto para a validação.`)
                 return // Sai da função após logar
             }
                  
@@ -85,8 +85,8 @@ module.exports = function SomaDosPacotes(client, config) {
 
     // Agenda o cron com a hora e minuto configurado
 
-    let minutoAgendado = Number(postagemMinuto) + 1;
-    let horaAgendada = Number(postagemHora);
+    let minutoAgendado = Number(corteMinuto) + 1;
+    let horaAgendada = Number(corteHora);
 
     if( minutoAgendado >= 60) {
         minutoAgendado = 0;
