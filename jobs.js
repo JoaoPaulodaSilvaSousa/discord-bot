@@ -36,6 +36,9 @@ module.exports = (client, config) => {
         canalid
     } = config;
 
+    // Log de configuração recebido
+    console.log(`🚨 Configuração recebida: corteHora=${corteHora}, corteMinuto=${corteMinuto}, postagemHora=${postagemHora}, postagemMinuto=${postagemMinuto}, canalid=${canalid}`);
+
     client.once('ready', async () => {
         console.log(`Logado como ${client.user.tag}`);
         const anoAtual = new Date().getFullYear();
@@ -50,8 +53,15 @@ module.exports = (client, config) => {
                 proximaExecucao = proximaExecucao.plus({ days: 1 });
             }
 
+            console.log(`🕓 Agendado para: ${proximaExecucao.toISO()} (hora: ${hora}, minuto: ${minuto})`);
+
             schedule.scheduleJob(proximaExecucao.toJSDate(), async function executar() {
-                await tarefa();
+                console.log('⏰ Executando tarefa agendada');
+                try {
+                    await tarefa();
+                } catch (err) {
+                    console.error('❌ Erro ao executar tarefa agendada:', err);
+                }
 
                 // Reagendar para o mesmo horário do dia seguinte
                 const novoHorario = proximaExecucao.plus({ days: 1 });
@@ -60,12 +70,18 @@ module.exports = (client, config) => {
         };
 
         // 🌅 Mensagem automática das 10h
-        agendarTarefaDiaria(22, 0, async () => {
+        agendarTarefaDiaria(14, 34, async () => {
             const canal = await client.channels.fetch(canalid).catch(() => null);
+            console.log(`🔍 Tentando encontrar o canal com ID: ${canalid}`);
+
             const hojeFormatada = new Date().toLocaleDateString('pt-BR');
             const nomeFeriado = FeriadoHoje();
 
-            if (!canal) return console.log('Canal não encontrado!');
+            if (!canal) {
+                console.log('❌ Canal não encontrado!');
+                return;
+            }
+
             if (nomeFeriado) {
                 await canal.send(`📢 Hoje é feriado: **${nomeFeriado}**. Nenhuma mensagem será enviada.`);
                 return;
@@ -90,7 +106,11 @@ module.exports = (client, config) => {
             const canal = await client.channels.fetch(canalid).catch(() => null);
             const nomeFeriado = FeriadoHoje();
 
-            if (!canal) return console.log('Canal não encontrado!');
+            if (!canal) {
+                console.log('❌ Canal não encontrado!');
+                return;
+            }
+
             if (nomeFeriado) {
                 await canal.send(`📢 Hoje é feriado: **${nomeFeriado}**. Não há corte de pacotes hoje.`);
                 return;
@@ -110,7 +130,11 @@ module.exports = (client, config) => {
             const canal = await client.channels.fetch(canalid).catch(() => null);
             const nomeFeriado = FeriadoHoje();
 
-            if (!canal) return console.log('Canal não encontrado!');
+            if (!canal) {
+                console.log('❌ Canal não encontrado!');
+                return;
+            }
+
             if (nomeFeriado) {
                 await canal.send(`📢 Hoje é feriado: **${nomeFeriado}**. Não há encerramento de postagem hoje.`);
                 return;

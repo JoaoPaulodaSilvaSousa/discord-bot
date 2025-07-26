@@ -1,15 +1,23 @@
 {
   "PLACE": {
-    "corteHora": 21,
-    "corteMinuto": 53,
-    "postagemHora": 20,
-    "postagemMinuto": 59,
+    "corteHora": 14,
+    "corteMinuto": 17,
+    "postagemHora": 14,
+    "postagemMinuto": 43,
     "atrasoMinutos": 1,
     "canalid": "1395521141371568301"
   },
   "ENTREGA_DIRETA": {
-    "corteHora": 21,
-    "corteMinuto": 57,
+    "corteHora": 14,
+    "corteMinuto": 45,
+    "postagemHora": 14,
+    "postagemMinuto": 0,
+    "atrasoMinutos": 1,
+    "canalid": "1395521141371568301"
+  },
+  "FLEX": {
+    "corteHora": 14,
+    "corteMinuto": 52,
     "postagemHora": 14,
     "postagemMinuto": 0,
     "atrasoMinutos": 1,
