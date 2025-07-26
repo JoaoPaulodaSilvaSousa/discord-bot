@@ -11,7 +11,7 @@ const { Client, Events, GatewayIntentBits, Collection, InteractionCallback, Mess
 
 const { token } = require('./config.json');
 
-const cron = require('node-cron');
+//const cron = require('node-cron'); renover
 
 // Create a new client instance
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] }); //Você está criando seu bot (client) com o "intenção" de usar apenas servidores (Guilds). Se quiser que o bot reaja a mensagens, reações, etc., precisaria adicionar mais intents.

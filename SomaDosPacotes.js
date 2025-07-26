@@ -1,135 +1,104 @@
-const ConfigHorarios = require('./configHorario.json')
-const cron = require('node-cron');
-const UltimosDados = {};    // Guarda o último conteúdo válido por canal
-
-// Configuração de horários diferentes para cada título (pode adicionar/remover)
-const HorariosPorTitulo = {
-    PLACE: { hora: 11, minuto: 50 },
-    ENTREGA_DIRETA: { hora: 15, minuto: 30 },
-
-
-    // adicione outros títulos e horários que quiser aqui
-}
-
+const ConfigHorarios = require('./configHorario.json');
+const schedule = require('node-schedule');
+const UltimosDados = {}; // Guarda o último conteúdo válido por canal
+const { DateTime } = require('luxon'); // Recomendado para lidar com timezone de forma confiável
 
 module.exports = function SomaDosPacotes(client) {
-    // Evento que escuta as mensagens
+    client.on('error', error => {
+        console.error('Erro emitido no client:', error);
+    });
+
     client.on('messageCreate', async (message) => {
         if (message.author.bot) return;
 
-
-        // Pega o título da mensagem: até ":" e em maiúsculo
-        // Exemplo: "PLACE: ITEM1=5" => título = PLACE
-
         const tituloMatch = message.content.match(/^([\w\s\-]+)\s*:/);
-        if (!tituloMatch) {
-            console.error(`Mensagem sem título válido: "${message.content}"`)
-            return;     // Se não tem título, sai
-        } 
+        if (!tituloMatch) return;
 
-        const tituloOriginal = tituloMatch[1].trim(); //preserva o nome original para exibição
+        const tituloOriginal = tituloMatch[1].trim();
+        const tituloKey = tituloOriginal.toUpperCase().replace(/\s+/g, '_');
 
-        const tituloKey = tituloOriginal.toUpperCase().replace(/\s+/g, '_'); // transforma "ENTREGA DIRETA" em "ENTREGA_DIRETA"
-
-        // Só processa se o título existir na configuração de horários
-
-        if (!HorariosPorTitulo[tituloKey]) {
-             console.error(`Título "${tituloOriginal}" não configurado nos horários.`);
-             return;
-        }
-
-        // Regex para achar "NOME = NÚMERO"
+        if (!ConfigHorarios[tituloKey]) return;
 
         const regex = /([\w\-]+)\s*=\s*(\d+)/g;
-
         let match;
         let total = 0;
         const partes = [];
 
-        // Procura todas as ocorrências do padrão na mensagem
         while ((match = regex.exec(message.content)) !== null) {
             const nome = match[1];
             const valor = parseInt(match[2], 10);
-            total += valor;
-            partes.push(`${nome} = ${valor}`);
+
+            if (!Number.isNaN(valor)) {
+                total += valor;
+                partes.push(`${nome} = ${valor}`);
+            }
         }
 
-        if (partes.length === 0) return; // Se não achou nada, sai
+        if (partes.length === 0) return;
 
-        // Monta a resposta formatada
         const resposta = `●__${tituloOriginal.toUpperCase()}__:\n${partes.join('\n')}\n●TOTAL ${tituloOriginal.toUpperCase()} = ${total}`;
-
-        // Armazena usando chave única canal+título
-
         const chave = `${message.channel.id}_${tituloKey}`;
         UltimosDados[chave] = { resposta, canalId: message.channel.id };
-
-        console.log(`Armazenado para ${chave}: \n${resposta}`);
     });
 
-    // Agora vamos criar agendamentos CRON para cada título configurado
+    console.log('[DEBUG] ConfigHorarios completo:', ConfigHorarios);
 
-    for (const tituloKey in HorariosPorTitulo) {
+    for (const tituloKey in ConfigHorarios) {
         const corte = ConfigHorarios[tituloKey];
         if (!corte) continue;
 
-        let minutoCorte = corte.corteMinuto;
-        let horaCorte = corte.corteHora;
+        let hora = parseInt(corte.corteHora, 10);
+        let minuto = parseInt(corte.corteMinuto, 10);
+        const atraso = parseInt(corte.atrasoMinutos, 10) || 0;
 
-        let minutoEnvio = minutoCorte;
-        let horaEnvio = horaCorte;
-
-        // Se for o PLACE, envie 10 minutos depois do corte
-        if (tituloKey === "PLACE") {
-            minutoEnvio +=10;
-            if (minutoEnvio >= 60) {
-                minutoEnvio %= 60;
-                horaEnvio = (horaEnvio + 1) % 24;
-            }
+        minuto += atraso;
+        if (minuto >= 60) {
+            minuto %= 60;
+            hora = (hora + 1) % 24;
         }
 
-        if (tituloKey === "ENTREGA_DIRETA") {
-            minutoEnvio = minutoCorte;
-            horaEnvio = horaCorte;
+        // Cria a data da próxima execução usando luxon com timezone Brasil
+        const now = DateTime.now().setZone('America/Sao_Paulo');
+        let proximaExecucao = now.set({ hour: hora, minute: minuto, second: 0, millisecond: 0 });
+
+        // Se o horário já passou hoje, agenda para amanhã
+        if (proximaExecucao < now) {
+            proximaExecucao = proximaExecucao.plus({ days: 1 });
         }
 
+        console.log(`[DEBUG] Agendando "${tituloKey}" para: ${proximaExecucao.toISO()} (${proximaExecucao.toFormat('HH:mm')})`);
 
+        const enviar = () => {
+            console.log(`⏰ Executando envio de "${tituloKey}"`);
 
-        const expressaoCron = `${minutoEnvio} ${horaEnvio} * * *`;
-        console.log(`Agendado envio para ${tituloKey} às ${horaEnvio}:${minutoEnvio.toString().padStart(2, '0')} (cron: "${expressaoCron}")`);
-
-        cron.schedule(expressaoCron, async () => {
-            console.log(`Executando envio de pacote ${tituloKey} às ${horaEnvio}:${minutoEnvio.toString().padStart(2, '0')}`);
-
-            // Filtra os dados armazenados para esse título (chave contém _titulo no final)
-
-
-            const chavesParaTitulo = Object.keys(UltimosDados).filter(chave => chave.endsWith(tituloKey));
-
-            if (chavesParaTitulo.length === 0) {
-                console.log(`Nenhum dado para ${tituloKey} neste horário.`);
+            const chaves = Object.keys(UltimosDados).filter(k => k.endsWith(`_${tituloKey}`));
+            if (chaves.length === 0) {
+                console.log(`ℹ️ Nenhum dado para "${tituloKey}" no horário agendado.`);
                 return;
             }
 
-            for (const chave of chavesParaTitulo) {
+            for (const chave of chaves) {
                 const { resposta, canalId } = UltimosDados[chave];
 
-                try {
-                    const canal = await client.channels.fetch(canalId);
+                client.channels.fetch(canalId).then(canal => {
                     if (!canal) {
-                        console.log(`Canal ${canalId} não encontrado para ${chave}.`);
-                        continue;
+                        console.warn(`⚠️ Canal "${canalId}" não encontrado`);
+                        return;
                     }
-                    await canal.send(resposta);
-                    console.log(`Mensagem enviada no canal ${canalId} para ${tituloKey}`);
-
-                    // Após enviar, pode limpar o dado para não reenviar
-
+                    canal.send(resposta);
+                    console.log(`📨 Enviado para canal "${canalId}" (${tituloKey})`);
                     delete UltimosDados[chave];
-                } catch (err) {
-                    console.error(`Erro ao enviar mensagem para canal ${canalId} (${tituloKey}):`, err);
-                }
+                }).catch(err => {
+                    console.error(`❌ Erro ao enviar para canal ${canalId}:`, err);
+                });
             }
-        })
+
+            // Reagendar para o dia seguinte
+            const proximo = DateTime.now().setZone('America/Sao_Paulo').plus({ days: 1 }).set({ hour: hora, minute: minuto, second: 0, millisecond: 0 });
+            console.log(`[DEBUG] Reagendando "${tituloKey}" para: ${proximo.toISO()}`);
+            schedule.scheduleJob(proximo.toJSDate(), enviar);
+        };
+
+        schedule.scheduleJob(proximaExecucao.toJSDate(), enviar);
     }
-}
+};

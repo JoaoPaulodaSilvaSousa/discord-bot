@@ -1,16 +1,18 @@
 {
   "PLACE": {
-    "corteHora": 22,
-    "corteMinuto": 10,
+    "corteHora": 21,
+    "corteMinuto": 53,
     "postagemHora": 20,
     "postagemMinuto": 59,
+    "atrasoMinutos": 1,
     "canalid": "1395521141371568301"
   },
   "ENTREGA_DIRETA": {
-    "corteHora": 13,
-    "corteMinuto": 0,
+    "corteHora": 21,
+    "corteMinuto": 57,
     "postagemHora": 14,
     "postagemMinuto": 0,
+    "atrasoMinutos": 1,
     "canalid": "1395521141371568301"
   }
 }
