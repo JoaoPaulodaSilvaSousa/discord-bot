@@ -8,7 +8,8 @@ module.exports = function SomaDosPacotes(client) {
         console.error('Erro emitido no client:', error);
     });
 
-    client.on('messageCreate', async (message) => {
+    // ✅ Função reutilizável para processar novas mensagens ou mensagens editadas
+    async function processarMensagem(message) {
         if (message.author.bot) return;
 
         const tituloMatch = message.content.match(/^([\w\s\-]+)\s*:/);
@@ -39,6 +40,16 @@ module.exports = function SomaDosPacotes(client) {
         const resposta = `●__${tituloOriginal.toUpperCase()}__:\n${partes.join('\n')}\n●TOTAL ${tituloOriginal.toUpperCase()} = ${total}`;
         const chave = `${message.channel.id}_${tituloKey}`;
         UltimosDados[chave] = { resposta, canalId: message.channel.id };
+    }
+
+    // ✅ Mensagens novas
+    client.on('messageCreate', processarMensagem);
+
+    // ✅ Mensagens editadas (verifica se tem conteúdo e processa de novo)
+    client.on('messageUpdate', (oldMessage, newMessage) => {
+        if (!newMessage.partial && newMessage.content) {
+            processarMensagem(newMessage);
+        }
     });
 
     console.log('[DEBUG] ConfigHorarios completo:', ConfigHorarios);
@@ -57,11 +68,9 @@ module.exports = function SomaDosPacotes(client) {
             hora = (hora + 1) % 24;
         }
 
-        // Cria a data da próxima execução usando luxon com timezone Brasil
         const now = DateTime.now().setZone('America/Sao_Paulo');
         let proximaExecucao = now.set({ hour: hora, minute: minuto, second: 0, millisecond: 0 });
 
-        // Se o horário já passou hoje, agenda para amanhã
         if (proximaExecucao < now) {
             proximaExecucao = proximaExecucao.plus({ days: 1 });
         }
@@ -93,7 +102,6 @@ module.exports = function SomaDosPacotes(client) {
                 });
             }
 
-            // Reagendar para o dia seguinte
             const proximo = DateTime.now().setZone('America/Sao_Paulo').plus({ days: 1 }).set({ hour: hora, minute: minuto, second: 0, millisecond: 0 });
             console.log(`[DEBUG] Reagendando "${tituloKey}" para: ${proximo.toISO()}`);
             schedule.scheduleJob(proximo.toJSDate(), enviar);

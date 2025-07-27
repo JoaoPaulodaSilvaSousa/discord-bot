@@ -1,20 +1,34 @@
 const { EmbedBuilder } = require('discord.js');
+
+// Importa o agendador de tarefas (substitui cron), ideal para executar funções em datas e horários específicos
 const schedule = require('node-schedule');
+
+// Importa o fetch para requisições HTTP (neste caso, usado para consultar a API de feriados)
 const fetch = require('node-fetch');
+
+// Luxon: biblioteca para manipular datas e horários com suporte a fuso horário
 const { DateTime } = require('luxon');
 
+// Função assíncrona que busca feriados nacionais do Brasil para o ano informado
 async function buscarFeriados(ano) {
     try {
         const url = `https://date.nager.at/api/v3/PublicHolidays/${ano}/BR`;
+
+        // Faz uma requisição HTTP GET para a URL definida anteriormente usando fetch (com suporte a await, pois estamos em uma função assíncrona)
+        // O resultado da requisição (resposta do servidor) é armazenado na variável "response"
         const response = await fetch(url);
         const feriados = await response.json();
 
+        // Retorna um novo array de objetos, mantendo apenas os campos relevantes de cada feriado:
+        // "data" formatada para o padrão brasileiro (dd/mm/aaaa) e o "nome" do feriado
         return feriados.map(f => ({
             data: new Date(f.date).toLocaleDateString('pt-BR'),
             nome: f.localName
         }));
     } catch (err) {
         console.error('Erro ao buscar feriados:', err);
+        // Retorna um array vazio para garantir que a função continue retornando um array,
+        // evitando que o programa quebre ao tentar usar o resultado.
         return [];
     }
 }
@@ -24,7 +38,7 @@ let feriadosBrasil = [];
 function FeriadoHoje() {
     const hoje = new Date().toLocaleDateString('pt-BR');
     const feriado = feriadosBrasil.find(f => f.data === hoje);
-    return feriado ? feriado.nome : null;
+    return feriado ? feriado.nome : null; // ?: é uma forma curta e prática de fazer um if simples em uma linha só.
 }
 
 module.exports = (client, config) => {
