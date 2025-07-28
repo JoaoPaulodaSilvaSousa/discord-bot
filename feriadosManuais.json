@@ -1,0 +1,16 @@
+[
+  { "data": "01/01/2025", "nome": "Confraternização Universal (Nacional)" },
+  { "data": "25/01/2025", "nome": "Aniversário da Cidade de São Paulo (Municipal)" },
+  { "data": "03/03/2025", "nome": "Carnaval (Ponto facultativo nacional)" },
+  { "data": "04/03/2025", "nome": "Carnaval (Ponto facultativo nacional)" },
+  { "data": "05/03/2025", "nome": "Quarta-feira de Cinzas (Ponto facultativo até 14h)" },
+  { "data": "21/04/2025", "nome": "Tiradentes (Nacional)" },
+  { "data": "01/05/2025", "nome": "Dia do Trabalho (Nacional)" },
+  { "data": "19/06/2025", "nome": "Corpus Christi (Ponto facultativo nacional)" },
+  { "data": "07/09/2025", "nome": "Independência do Brasil (Nacional)" },
+  { "data": "15/11/2025", "nome": "Proclamação da República (Nacional)" },
+  { "data": "20/11/2025", "nome": "Dia da Consciência Negra (Municipal SP)" },
+  { "data": "24/12/2025", "nome": "Véspera de Natal (Ponto facultativo após 14h)" },
+  { "data": "25/12/2025", "nome": "Natal (Nacional)" },
+  { "data": "31/12/2025", "nome": "Véspera de Ano Novo (Ponto facultativo após 14h)" }
+]

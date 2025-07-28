@@ -1,24 +1,91 @@
 const ConfigHorarios = require('./configHorario.json');
 const schedule = require('node-schedule');
-const UltimosDados = {}; // Guarda o último conteúdo válido por canal
-const { DateTime } = require('luxon'); // Recomendado para lidar com timezone de forma confiável
+const UltimosDados = {};
+const { DateTime } = require('luxon');
+const fetch = require('node-fetch');
 
-module.exports = function SomaDosPacotes(client) {
+let feriadosBrasil = [];
+
+function isFimDeSemana() {
+    const hoje = DateTime.now().setZone('America/Sao_Paulo');
+    return hoje.weekday === 6 || hoje.weekday === 7;
+}
+
+function FeriadoHoje() {
+    const hoje = new Date().toLocaleDateString('pt-BR');
+    const feriado = feriadosBrasil.find(f => f.data === hoje);
+    return feriado?.nome || null;
+}
+
+async function carregarFeriados(ano) {
+    try {
+        const url = `https://date.nager.at/api/v3/PublicHolidays/${ano}/BR`;
+        const response = await fetch(url);
+        const feriados = await response.json();
+        const feriadosManuais = require('./feriadosManuais.json');
+
+        const feriadosNacionais = feriados.map(f => ({
+            data: new Date(f.date).toLocaleDateString('pt-BR'),
+            nome: f.localName
+        }));
+
+        const todos = [...feriadosNacionais, ...feriadosManuais];
+        return todos.filter((feriado, index, self) =>
+            index === self.findIndex(f => f.data === feriado.data)
+        );
+    } catch (err) {
+        console.error('Erro ao carregar feriados:', err);
+        return require('./feriadosManuais.json');
+    }
+}
+
+module.exports = async function SomaDosPacotes(client) {
+    const anoAtual = new Date().getFullYear();
+
+    // Carrega feriados do ano atual e do próximo ano
+    feriadosBrasil = [
+        ...await carregarFeriados(anoAtual),
+        ...await carregarFeriados(anoAtual + 1)
+    ];
+
+    console.log('✅ Feriados carregados:', feriadosBrasil);
+
     client.on('error', error => {
         console.error('Erro emitido no client:', error);
     });
 
-    // ✅ Função reutilizável para processar novas mensagens ou mensagens editadas
     async function processarMensagem(message) {
         if (message.author.bot) return;
 
         const tituloMatch = message.content.match(/^([\w\s\-]+)\s*:/);
-        if (!tituloMatch) return;
+        if (!tituloMatch) {
+            const aviso = await message.reply({
+                content: '⚠️ Você esqueceu de colocar o título no início da mensagem. Exemplo: `PLACE: Nome = valor`',
+                allowedMentions: { repliedUser: false }
+            });
+
+            setTimeout(() => {
+                aviso.delete().catch(() => {});
+                message.delete().catch(() => {});
+            }, 10000);
+            return;
+        }
 
         const tituloOriginal = tituloMatch[1].trim();
         const tituloKey = tituloOriginal.toUpperCase().replace(/\s+/g, '_');
 
-        if (!ConfigHorarios[tituloKey]) return;
+        if (!ConfigHorarios[tituloKey]) {
+            const aviso = await message.reply({
+                content: `❌ O título **${tituloOriginal}** não é reconhecido. Verifique se escreveu corretamente.`,
+                allowedMentions: { repliedUser: false }
+            });
+
+            setTimeout(() => {
+                aviso.delete().catch(() => {});
+                message.delete().catch(() => {});
+            }, 10000);
+            return;
+        }
 
         const regex = /([\w\-]+)\s*=\s*(\d+)/g;
         let match;
@@ -42,10 +109,7 @@ module.exports = function SomaDosPacotes(client) {
         UltimosDados[chave] = { resposta, canalId: message.channel.id };
     }
 
-    // ✅ Mensagens novas
     client.on('messageCreate', processarMensagem);
-
-    // ✅ Mensagens editadas (verifica se tem conteúdo e processa de novo)
     client.on('messageUpdate', (oldMessage, newMessage) => {
         if (!newMessage.partial && newMessage.content) {
             processarMensagem(newMessage);
@@ -79,6 +143,17 @@ module.exports = function SomaDosPacotes(client) {
 
         const enviar = () => {
             console.log(`⏰ Executando envio de "${tituloKey}"`);
+
+            if (isFimDeSemana()) {
+                console.log('⏸️ Não envia mensagem porque hoje é final de semana.');
+                return;
+            }
+
+            const nomeFeriado = FeriadoHoje();
+            if (nomeFeriado) {
+                console.log(`⏸️ Não envia mensagem porque hoje é feriado: ${nomeFeriado}`);
+                return;
+            }
 
             const chaves = Object.keys(UltimosDados).filter(k => k.endsWith(`_${tituloKey}`));
             if (chaves.length === 0) {
