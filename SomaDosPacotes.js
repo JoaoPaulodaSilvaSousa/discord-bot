@@ -65,8 +65,8 @@ module.exports = async function SomaDosPacotes(client) {
             });
 
             setTimeout(() => {
-                aviso.delete().catch(() => {});
-                message.delete().catch(() => {});
+                aviso.delete().catch(() => { });
+                message.delete().catch(() => { });
             }, 10000);
             return;
         }
@@ -81,8 +81,8 @@ module.exports = async function SomaDosPacotes(client) {
             });
 
             setTimeout(() => {
-                aviso.delete().catch(() => {});
-                message.delete().catch(() => {});
+                aviso.delete().catch(() => { });
+                message.delete().catch(() => { });
             }, 10000);
             return;
         }
@@ -104,9 +104,15 @@ module.exports = async function SomaDosPacotes(client) {
 
         if (partes.length === 0) return;
 
-        const resposta = `●__${tituloOriginal.toUpperCase()}__:\n${partes.join('\n')}\n●TOTAL ${tituloOriginal.toUpperCase()} = ${total}`;
+        const resposta = `●__${tituloOriginal.toUpperCase()}__:\n${partes.join('\n')}\n●__TOTAL ${tituloOriginal.toUpperCase()}__ = ${total}`;
         const chave = `${message.channel.id}_${tituloKey}`;
         UltimosDados[chave] = { resposta, canalId: message.channel.id };
+        try {
+            await message.react('✅');  // Reage com um ✅ na mensagem do funcionário
+            console.log(`✅ Mensagem registrada: ${resposta}`);
+        } catch (err) {
+            console.warn('⚠️ Não foi possível reagir à mensagem:', err);
+        }
     }
 
     client.on('messageCreate', processarMensagem);
@@ -169,7 +175,20 @@ module.exports = async function SomaDosPacotes(client) {
                         console.warn(`⚠️ Canal "${canalId}" não encontrado`);
                         return;
                     }
-                    canal.send(resposta);
+
+                    const { EmbedBuilder } = require('discord.js');
+
+                    const embed = new EmbedBuilder()
+                        .setColor(0x00BFFF)
+                        .setTitle(`📦 Soma Total: ${tituloKey.replace(/_/g, ' ')}`)
+                        .setDescription(resposta)
+                        .setTimestamp();
+
+                    canal.send({
+                        content: '@everyone',
+                        embeds: [embed],
+                        allowedMentions: { parse: ['everyone'] }
+                    });
                     console.log(`📨 Enviado para canal "${canalId}" (${tituloKey})`);
                     delete UltimosDados[chave];
                 }).catch(err => {

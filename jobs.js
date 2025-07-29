@@ -49,7 +49,7 @@ async function buscarFeriados(ano) {
 function isFimDeSemana() {
     const hoje = DateTime.now().setZone('America/Sao_Paulo');
     // weekday: 1=segunda ... 6=sábado, 7=domingo
-    return hoje.weekday === 6 //|| hoje.weekday === 7;
+    return hoje.weekday === 6 || hoje.weekday === 7;
 }
 
 let feriadosBrasil = [];
@@ -108,8 +108,8 @@ module.exports = (client, config) => {
             });
         };
 
-        // 🌅 Mensagem automática das 10h
-        agendarTarefaDiaria(21, 39, async () => {
+        // 🌅 Mensagem automática das 9h
+        agendarTarefaDiaria(9, 0, async () => {
 
             if (isFimDeSemana()) {
                 console.log('Não executa porque hoje é final de semana.');
@@ -122,43 +122,60 @@ module.exports = (client, config) => {
             const hojeFormatada = new Date().toLocaleDateString('pt-BR');
             const nomeFeriado = FeriadoHoje();
 
+            if (nomeFeriado) {
+                console.log(`Não executa porque hoje é feriado: ${nomeFeriado}`);
+                return;
+            }
+
             if (!canal) {
                 console.log('❌ Canal não encontrado!');
                 return;
             }
 
-            if (nomeFeriado) {
-                await canal.send(`📢 Hoje é feriado: **${nomeFeriado}**. Nenhuma mensagem será enviada.`);
-                return;
-            }
 
             const embed = new EmbedBuilder()
                 .setTitle('☀️ Bom dia!')
                 .setDescription('Esta é a mensagem automática das 10h!')
                 .addFields(
                     { name: 'Data de Hoje:', value: hojeFormatada },
-                    { name: '🕒 Horário de corte:', value: `${String(corteHora).padStart(2, '0')}:${String(corteMinuto).padStart(2, '0')}`, inline: true },
-                    { name: '🚚 Horário de postagem:', value: `${String(postagemHora).padStart(2, '0')}:${String(postagemMinuto).padStart(2, '0')}`, inline: true },
+                    { name: '🕒 Horário de corte Place:', value: `${String(corteHora).padStart(2, '0')}:${String(corteMinuto).padStart(2, '0')}`, inline: true },
+                    { name: '🚚 Horário de postagem Place:', value: `${String(postagemHora).padStart(2, '0')}:${String(postagemMinuto).padStart(2, '0')}`, inline: true },
                     { name: '\n', value: '\n', inline: false }
                 )
 
                 .addFields(
                     {
-                        name: '__Segue os horários de corte e postagem fixos__:\n●__Flex__:',
-                        value: 'Hora de corte = 13:00\nHora de Postagem = 16:00',
+                        name: '__Segue os horários de corte e postagem fixos__:\n\n●__Shopee__:',
+                        value: 'Hora de corte: Tudo que sair em 24h\nHora de postagem: tudo que saiu nas 24 horas',
                         inline: false
                     },
 
-                    { name: '●__Shopee__', value: 'Hora de corte: Tudo que sair em 24h\nHora de postagem: tudo que saiu nas 24 horas (1 Dia)', inline: false},
+                    { name: '●__Shopee Entrega Direta__:', value: 'Hora de corte: 13:00\nHora de postagem: 16:00', inline: false },
 
-                    { name: '●__Shopee Entrega Direta__', value: 'Hora de corte: 13:00\nHora de postagem: 16:00', inline: false}
+                    { name: '●__Magalu Correios__:', value: 'Hora de corte: ?\nHora de postagem: 15:00', inline: false },
+
+                    { name: '●__Correios Mercado Livre__:', value: 'Hora de corte: 14:00\nHora de postagem: 18:00', inline: false },
+
+                    { name: '●__Magalu Ultra Rápida Logmannager__:', value: 'Hora de corte: 12:00\nHora de postagem: ?', inline: false },
+
+                    { name: '●__Magalu Ultra Rápida Sodienter__:', value: 'Hora de corte: ?\nHora de postagem: 15:00', inline: false },
+
+                    { name: '●__Flex__:', value: 'Hora de corte: 13:00\nHora de postagem: 16:00', inline: false },
+
+                    { name: '●__Turbo__:', value: 'Hora de corte: ?\nHora de postagem: Até as 16:00', inline: false },
+
+                    { name: '●__Modelo para a soma dos pacotes__:', value: 'LOGISTICA:\nTEFESTAS = NÚMERO DE PACOTES\nEZITO = NÚMERO DE PACOTES\nE-NOVA = NÚMERO DE PACOTES\nKIARUS = NÚMERO DE PACOTES', inline: false },
                 )
 
 
                 .setColor('Yellow')
                 .setTimestamp();
 
-            await canal.send({ embeds: [embed] });
+            await canal.send({
+                content: '@everyone',
+                embeds: [embed],
+                allowedMentions: { parse: ['everyone'] }
+            });
         });
 
         // ⏰ Corte
@@ -172,23 +189,28 @@ module.exports = (client, config) => {
             const canal = await client.channels.fetch(canalid).catch(() => null);
             const nomeFeriado = FeriadoHoje();
 
+            if (nomeFeriado) {
+                console.log(`Não executa porque hoje é feriado: ${nomeFeriado}`);
+                return;
+            }
+
             if (!canal) {
                 console.log('❌ Canal não encontrado!');
                 return;
             }
 
-            if (nomeFeriado) {
-                await canal.send(`📢 Hoje é feriado: **${nomeFeriado}**. Não há corte de pacotes hoje.`);
-                return;
-            }
 
             const embed = new EmbedBuilder()
                 .setTitle('Prepare todos os pacotes!')
-                .setDescription(`🚨 __**ATENÇÃO!**__ 🚨 O horário de corte das **${String(corteHora).padStart(2, '0')}:${String(corteMinuto).padStart(2, '0')}** foi atingido. Todos os pacotes devem estar feitos.`)
+                .setDescription(`🚨 __**ATENÇÃO!**__ 🚨 O horário de corte **Place** das **${String(corteHora).padStart(2, '0')}:${String(corteMinuto).padStart(2, '0')}** foi atingido. Todos os pacotes devem estar feitos.`)
                 .setColor('Orange')
                 .setTimestamp();
 
-            await canal.send({ embeds: [embed] });
+            await canal.send({
+                content: '@everyone',
+                embeds: [embed],
+                allowedMentions: { parse: ['everyone'] }
+            });
         });
 
         // 🚚 Postagem
@@ -202,23 +224,28 @@ module.exports = (client, config) => {
             const canal = await client.channels.fetch(canalid).catch(() => null);
             const nomeFeriado = FeriadoHoje();
 
+            if (nomeFeriado) {
+                console.log(`Não executa porque hoje é feriado: ${nomeFeriado}`);
+                return;
+            }
+
             if (!canal) {
                 console.log('❌ Canal não encontrado!');
                 return;
             }
 
-            if (nomeFeriado) {
-                await canal.send(`📢 Hoje é feriado: **${nomeFeriado}**. Não há encerramento de postagem hoje.`);
-                return;
-            }
 
             const embed = new EmbedBuilder()
-                .setTitle('⚠️ __Hora de postagem finalizado!__ ⚠️')
+                .setTitle('⚠️ __Hora de postagem **Place** finalizado!__ ⚠️')
                 .setDescription(`Se você não realizou a postagem das **${String(postagemHora).padStart(2, '0')}:${String(postagemMinuto).padStart(2, '0')}**, infelizmente os pacotes entrarão em atraso!`)
                 .setColor('Red')
                 .setTimestamp();
 
-            await canal.send({ embeds: [embed] });
+            await canal.send({
+                content: '@everyone',
+                embeds: [embed],
+                allowedMentions: { parse: ['everyone'] }
+            });
         });
     });
 };
