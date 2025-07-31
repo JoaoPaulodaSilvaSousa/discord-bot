@@ -76,7 +76,7 @@ module.exports = async function SomaDosPacotes(client) {
 
         if (!ConfigHorarios[tituloKey]) {
             const aviso = await message.reply({
-                content: `❌ O título **${tituloOriginal}** não é reconhecido. Verifique se escreveu corretamente.`,
+                content: `❌ O título **${tituloOriginal}** não é reconhecido. Verifique se escreveu corretamente. Esta mesangem séra apagada dentro de 10 segundos!`,
                 allowedMentions: { repliedUser: false }
             });
 
@@ -108,7 +108,7 @@ module.exports = async function SomaDosPacotes(client) {
         const chave = `${message.channel.id}_${tituloKey}`;
         UltimosDados[chave] = { resposta, canalId: message.channel.id };
         try {
-            await message.react('✅');  // Reage com um ✅ na mensagem do funcionário
+            await message.react('✅');  // Reage com um ✅ na mensagem
             console.log(`✅ Mensagem registrada: ${resposta}`);
         } catch (err) {
             console.warn('⚠️ Não foi possível reagir à mensagem:', err);

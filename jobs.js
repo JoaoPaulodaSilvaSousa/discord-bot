@@ -1,54 +1,36 @@
 const { EmbedBuilder } = require('discord.js');
-
-// Importa o agendador de tarefas (substitui cron), ideal para executar funções em datas e horários específicos
 const schedule = require('node-schedule');
-
-// Importa o fetch para requisições HTTP (neste caso, usado para consultar a API de feriados)
 const fetch = require('node-fetch');
-
-// Luxon: biblioteca para manipular datas e horários com suporte a fuso horário
 const { DateTime } = require('luxon');
+const configHorario = require('./configHorario.json'); // necessário para montar os horários dinâmicos
 
-// Função assíncrona que busca feriados nacionais do Brasil para o ano informado
 async function buscarFeriados(ano) {
     try {
         const url = `https://date.nager.at/api/v3/PublicHolidays/${ano}/BR`;
-
-        // Faz uma requisição HTTP GET para a URL definida anteriormente usando fetch (com suporte a await, pois estamos em uma função assíncrona)
-        // O resultado da requisição (resposta do servidor) é armazenado na variável "response"
         const response = await fetch(url);
         const feriados = await response.json();
         const feriadosManuais = require('./feriadosManuais.json');
 
-
-        // Retorna um novo array de objetos, mantendo apenas os campos relevantes de cada feriado:
-        // "data" formatada para o padrão brasileiro (dd/mm/aaaa) e o "nome" do feriado
         const feriadosNacionais = feriados.map(f => ({
             data: new Date(f.date).toLocaleDateString('pt-BR'),
             nome: f.localName
         }));
 
-        // Junta os feriados da API com os manuais
-        const todosFeriados = [...feriadosNacionais, ...feriadosManuais]; //O spread operator ... "espalha" todos os elementos do array dentro de outro array.
+        const todosFeriados = [...feriadosNacionais, ...feriadosManuais];
 
-        // Remove duplicados pela data
-        const feriadosUnicos = todosFeriados.filter( //todosFeriados.filter(...) cria um novo array contendo só os elementos que passam no teste da função passada como argumento. A função de filtro recebe: feriado: o objeto feriado atual que está sendo analisado. ||  index: o índice desse objeto no array original (todosFeriados). ||self: o próprio array todosFeriados
-            (feriado, index, self) =>
-                index === self.findIndex(f => f.data === feriado.data)
+        const feriadosUnicos = todosFeriados.filter((feriado, index, self) =>
+            index === self.findIndex(f => f.data === feriado.data)
         );
 
         return feriadosUnicos;
     } catch (err) {
         console.error('Erro ao buscar feriados:', err);
-        // Retorna um array vazio para garantir que a função continue retornando um array,
-        // evitando que o programa quebre ao tentar usar o resultado.
-        return require('./feriadosManuais.json'); // Retorna apenas os feriados manuais se a API falhar
+        return require('./feriadosManuais.json');
     }
 }
 
 function isFimDeSemana() {
     const hoje = DateTime.now().setZone('America/Sao_Paulo');
-    // weekday: 1=segunda ... 6=sábado, 7=domingo
     return hoje.weekday === 6 || hoje.weekday === 7;
 }
 
@@ -57,10 +39,11 @@ let feriadosBrasil = [];
 function FeriadoHoje() {
     const hoje = new Date().toLocaleDateString('pt-BR');
     const feriado = feriadosBrasil.find(f => f.data === hoje);
-    return feriado ? feriado.nome : null; // ?: é uma forma curta e prática de fazer um if simples em uma linha só.
+    return feriado ? feriado.nome : null;
 }
 
-module.exports = (client, config) => {
+// Função exportada que agenda as tarefas, para ser chamada quando client estiver ready
+async function agendarTarefas(client, config, TituloFormatado) {
     const {
         corteHora,
         corteMinuto,
@@ -69,183 +52,153 @@ module.exports = (client, config) => {
         canalid
     } = config;
 
-    // Log de configuração recebido
     console.log(`🚨 Configuração recebida: corteHora=${corteHora}, corteMinuto=${corteMinuto}, postagemHora=${postagemHora}, postagemMinuto=${postagemMinuto}, canalid=${canalid}`);
 
-    client.once('ready', async () => {
-        console.log(`Logado como ${client.user.tag}`);
-        const anoAtual = new Date().getFullYear();
-        feriadosBrasil = await buscarFeriados(anoAtual);
-        console.log('Feriados carregados:', feriadosBrasil);
+    // Busca feriados antes de agendar
+    const anoAtual = new Date().getFullYear();
+    feriadosBrasil = await buscarFeriados(anoAtual);
+    console.log('Feriados carregados:', feriadosBrasil);
 
-        const agendarTarefaDiaria = (hora, minuto, tarefa) => {
-            let agora = DateTime.now().setZone('America/Sao_Paulo');
-            let proximaExecucao = agora.set({ hour: hora, minute: minuto, second: 0, millisecond: 0 });
+    const agendarTarefaDiaria = (hora, minuto, tarefa) => {
+        let agora = DateTime.now().setZone('America/Sao_Paulo');
+        let proximaExecucao = agora.set({ hour: hora, minute: minuto, second: 0, millisecond: 0 });
 
-            if (proximaExecucao < agora) {
-                proximaExecucao = proximaExecucao.plus({ days: 1 });
-            }
+        if (proximaExecucao < agora) {
+            proximaExecucao = proximaExecucao.plus({ days: 1 });
+        }
 
-            console.log(`🕓 Agendado para: ${proximaExecucao.toISO()} (hora: ${hora}, minuto: ${minuto})`);
+        console.log(`🕓 Agendado para: ${proximaExecucao.toISO()} (hora: ${hora}, minuto: ${minuto})`);
 
-            schedule.scheduleJob(proximaExecucao.toJSDate(), async function executar() {
-
-                if (isFimDeSemana()) {
-                    console.log('Não executa porque hoje é final de semana.');
-                    return;
-                }
-
-                console.log('⏰ Executando tarefa agendada');
-                try {
-                    await tarefa();
-                } catch (err) {
-                    console.error('❌ Erro ao executar tarefa agendada:', err);
-                }
-
-                // Reagendar para o mesmo horário do dia seguinte
-                const novoHorario = proximaExecucao.plus({ days: 1 });
-                schedule.scheduleJob(novoHorario.toJSDate(), executar);
-            });
-        };
-
-        // 🌅 Mensagem automática das 9h
-        agendarTarefaDiaria(9, 0, async () => {
-
+        schedule.scheduleJob(proximaExecucao.toJSDate(), async function executar() {
             if (isFimDeSemana()) {
                 console.log('Não executa porque hoje é final de semana.');
                 return;
             }
 
-            const canal = await client.channels.fetch(canalid).catch(() => null);
-            console.log(`🔍 Tentando encontrar o canal com ID: ${canalid}`);
-
-            const hojeFormatada = new Date().toLocaleDateString('pt-BR');
-            const nomeFeriado = FeriadoHoje();
-
-            if (nomeFeriado) {
-                console.log(`Não executa porque hoje é feriado: ${nomeFeriado}`);
-                return;
+            try {
+                await tarefa();
+            } catch (err) {
+                console.error('❌ Erro ao executar tarefa agendada:', err);
             }
 
-            if (!canal) {
-                console.log('❌ Canal não encontrado!');
-                return;
-            }
+            const novoHorario = proximaExecucao.plus({ days: 1 });
+            schedule.scheduleJob(novoHorario.toJSDate(), executar);
+        });
+    };
 
+    // ✅ Mensagem automática das 9h com horários vindos do JSON
+    agendarTarefaDiaria(9, 0, async () => {
+        if (isFimDeSemana()) return;
 
-            const embed = new EmbedBuilder()
-                .setTitle('☀️ Bom dia!')
-                .setDescription('Esta é a mensagem automática das 10h!')
-                .addFields(
-                    { name: 'Data de Hoje:', value: hojeFormatada },
-                    { name: '🕒 Horário de corte Place:', value: `${String(corteHora).padStart(2, '0')}:${String(corteMinuto).padStart(2, '0')}`, inline: true },
-                    { name: '🚚 Horário de postagem Place:', value: `${String(postagemHora).padStart(2, '0')}:${String(postagemMinuto).padStart(2, '0')}`, inline: true },
-                    { name: '\n', value: '\n', inline: false }
-                )
+        const canal = await client.channels.fetch(canalid).catch(() => null);
+        if (!canal) {
+            console.log('❌ Canal não encontrado!');
+            return;
+        }
 
-                .addFields(
-                    {
-                        name: '__Segue os horários de corte e postagem fixos__:\n\n●__Shopee__:',
-                        value: 'Hora de corte: Tudo que sair em 24h\nHora de postagem: tudo que saiu nas 24 horas',
-                        inline: false
-                    },
+        const nomeFeriado = FeriadoHoje();
+        if (nomeFeriado) {
+            console.log(`Não executa porque hoje é feriado: ${nomeFeriado}`);
+            return;
+        }
 
-                    { name: '●__Shopee Entrega Direta__:', value: 'Hora de corte: 13:00\nHora de postagem: 16:00', inline: false },
+        const hojeFormatada = new Date().toLocaleDateString('pt-BR');
 
-                    { name: '●__Magalu Correios__:', value: 'Hora de corte: ?\nHora de postagem: 15:00', inline: false },
+        const horariosFields = Object.entries(configHorario).map(([titulo, conf]) => {
+            const nomeFormatado = titulo.replace(/_/g, ' ').toUpperCase();
+            const corte = `${String(conf.corteHora).padStart(2, '0')}:${String(conf.corteMinuto).padStart(2, '0')}`;
+            const postagem = `${String(conf.postagemHora).padStart(2, '0')}:${String(conf.postagemMinuto).padStart(2, '0')}`;
 
-                    { name: '●__Correios Mercado Livre__:', value: 'Hora de corte: 14:00\nHora de postagem: 18:00', inline: false },
-
-                    { name: '●__Magalu Ultra Rápida Logmannager__:', value: 'Hora de corte: 12:00\nHora de postagem: ?', inline: false },
-
-                    { name: '●__Magalu Ultra Rápida Sodienter__:', value: 'Hora de corte: ?\nHora de postagem: 15:00', inline: false },
-
-                    { name: '●__Flex__:', value: 'Hora de corte: 13:00\nHora de postagem: 16:00', inline: false },
-
-                    { name: '●__Turbo__:', value: 'Hora de corte: ?\nHora de postagem: Até as 16:00', inline: false },
-
-                    { name: '●__Modelo para a soma dos pacotes__:', value: 'LOGISTICA:\nTEFESTAS = NÚMERO DE PACOTES\nEZITO = NÚMERO DE PACOTES\nE-NOVA = NÚMERO DE PACOTES\nKIARUS = NÚMERO DE PACOTES', inline: false },
-                )
-
-
-                .setColor('Yellow')
-                .setTimestamp();
-
-            await canal.send({
-                content: '@everyone',
-                embeds: [embed],
-                allowedMentions: { parse: ['everyone'] }
-            });
+            return {
+                name: `●__${nomeFormatado}__`,
+                value: `Hora de corte: ${corte}\nHora de postagem: ${postagem}`,
+                inline: false
+            };
         });
 
-        // ⏰ Corte
-        agendarTarefaDiaria(corteHora, corteMinuto, async () => {
+        const embed = new EmbedBuilder()
+            .setTitle('☀️ Bom dia!')
+            .setDescription('Esta é a mensagem automática das 9h!')
+            .addFields(
+                { name: 'Data de Hoje:', value: hojeFormatada },
+                { name: '🕒 Horário de corte Place:', value: `${String(corteHora).padStart(2, '0')}:${String(corteMinuto).padStart(2, '0')}`, inline: true },
+                { name: '🚚 Horário de postagem Place:', value: `${String(postagemHora).padStart(2, '0')}:${String(postagemMinuto).padStart(2, '0')}`, inline: true },
+                { name: '\n', value: '\n', inline: false },
+                { name: '__Segue os horários de corte e postagem dinâmicos__:', value: '\u200B', inline: false },
+                ...horariosFields,
+                {
+                    name: '●__Modelo para a soma dos pacotes__:',
+                    value: 'LOGISTICA:\nTEFESTAS = NÚMERO DE PACOTES\nEZITO = NÚMERO DE PACOTES\nE-NOVA = NÚMERO DE PACOTES\nKIARUS = NÚMERO DE PACOTES',
+                    inline: false
+                }
+            )
+            .setColor('Yellow')
+            .setTimestamp();
 
-            if (isFimDeSemana()) {
-                console.log('Não executa porque hoje é final de semana.');
-                return;
-            }
-
-            const canal = await client.channels.fetch(canalid).catch(() => null);
-            const nomeFeriado = FeriadoHoje();
-
-            if (nomeFeriado) {
-                console.log(`Não executa porque hoje é feriado: ${nomeFeriado}`);
-                return;
-            }
-
-            if (!canal) {
-                console.log('❌ Canal não encontrado!');
-                return;
-            }
-
-
-            const embed = new EmbedBuilder()
-                .setTitle('Prepare todos os pacotes!')
-                .setDescription(`🚨 __**ATENÇÃO!**__ 🚨 O horário de corte **Place** das **${String(corteHora).padStart(2, '0')}:${String(corteMinuto).padStart(2, '0')}** foi atingido. Todos os pacotes devem estar feitos.`)
-                .setColor('Orange')
-                .setTimestamp();
-
-            await canal.send({
-                content: '@everyone',
-                embeds: [embed],
-                allowedMentions: { parse: ['everyone'] }
-            });
-        });
-
-        // 🚚 Postagem
-        agendarTarefaDiaria(postagemHora, postagemMinuto, async () => {
-
-            if (isFimDeSemana()) {
-                console.log('Não executa porque hoje é final de semana.');
-                return;
-            }
-
-            const canal = await client.channels.fetch(canalid).catch(() => null);
-            const nomeFeriado = FeriadoHoje();
-
-            if (nomeFeriado) {
-                console.log(`Não executa porque hoje é feriado: ${nomeFeriado}`);
-                return;
-            }
-
-            if (!canal) {
-                console.log('❌ Canal não encontrado!');
-                return;
-            }
-
-
-            const embed = new EmbedBuilder()
-                .setTitle('⚠️ __Hora de postagem **Place** finalizado!__ ⚠️')
-                .setDescription(`Se você não realizou a postagem das **${String(postagemHora).padStart(2, '0')}:${String(postagemMinuto).padStart(2, '0')}**, infelizmente os pacotes entrarão em atraso!`)
-                .setColor('Red')
-                .setTimestamp();
-
-            await canal.send({
-                content: '@everyone',
-                embeds: [embed],
-                allowedMentions: { parse: ['everyone'] }
-            });
+        await canal.send({
+            content: '@everyone',
+            embeds: [embed],
+            allowedMentions: { parse: ['everyone'] }
         });
     });
-};
+
+    // Corte
+    agendarTarefaDiaria(corteHora, corteMinuto, async () => {
+        if (isFimDeSemana()) return;
+
+        const canal = await client.channels.fetch(canalid).catch(() => null);
+        if (!canal) {
+            console.log('❌ Canal não encontrado!');
+            return;
+        }
+
+        const nomeFeriado = FeriadoHoje();
+        if (nomeFeriado) {
+            console.log(`Não executa porque hoje é feriado: ${nomeFeriado}`);
+            return;
+        }
+
+        const embed = new EmbedBuilder()
+            .setTitle('Prepare todos os pacotes!')
+            .setDescription(`🚨 __**ATENÇÃO!**__ 🚨 O horário de corte **${TituloFormatado}** das **${String(corteHora).padStart(2, '0')}:${String(corteMinuto).padStart(2, '0')}** foi atingido. Todos os pacotes devem estar feitos.`)
+            .setColor('Orange')
+            .setTimestamp();
+
+        await canal.send({
+            content: '@everyone',
+            embeds: [embed],
+            allowedMentions: { parse: ['everyone'] }
+        });
+    });
+
+    // Postagem
+    agendarTarefaDiaria(postagemHora, postagemMinuto, async () => {
+        if (isFimDeSemana()) return;
+
+        const canal = await client.channels.fetch(canalid).catch(() => null);
+        if (!canal) {
+            console.log('❌ Canal não encontrado!');
+            return;
+        }
+
+        const nomeFeriado = FeriadoHoje();
+        if (nomeFeriado) {
+            console.log(`Não executa porque hoje é feriado: ${nomeFeriado}`);
+            return;
+        }
+
+        const embed = new EmbedBuilder()
+            .setTitle(`⚠️ __Hora de postagem **${TituloFormatado}** finalizado!__ ⚠️`)
+            .setDescription(`Se você não realizou a postagem das **${String(postagemHora).padStart(2, '0')}:${String(postagemMinuto).padStart(2, '0')}**, infelizmente os pacotes entrarão em atraso!`)
+            .setColor('Red')
+            .setTimestamp();
+
+        await canal.send({
+            content: '@everyone',
+            embeds: [embed],
+            allowedMentions: { parse: ['everyone'] }
+        });
+    });
+}
+
+module.exports = agendarTarefas;

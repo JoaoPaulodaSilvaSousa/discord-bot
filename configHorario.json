@@ -1,18 +1,18 @@
 {
   "PLACE": {
-    "corteHora": 13,
+    "corteHora": 14,
     "corteMinuto": 0,
     "postagemHora": 14,
     "postagemMinuto": 0,
-    "atrasoMinutos": 0,
+    "atrasoMinutos": 10,
     "canalid": "1395521141371568301"
   },
-  "ENTREGA_DIRETA": {
+  "SHOPEE_ENTREGA_DIRETA": {
     "corteHora": 13,
     "corteMinuto": 0,
     "postagemHora": 16,
     "postagemMinuto": 0,
-    "atrasoMinutos": 10,
+    "atrasoMinutos": 1,
     "canalid": "1395521141371568301"
   },
   "FLEX": {
@@ -39,7 +39,7 @@
     "atrasoMinutos": 10,
     "canalid": "1395521141371568301"
   },
-  "CORREIOS": {
+  "MERCADO_CORREIOS": {
     "corteHora": 14,
     "corteMinuto": 0,
     "postagemHora": 18,
