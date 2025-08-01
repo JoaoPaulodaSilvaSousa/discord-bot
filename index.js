@@ -15,8 +15,9 @@ const client = new Client({
 
 client.commands = new Collection();
 
-const foldersPath = path.join(__dirname, 'commands');
-const commandFolder = fs.readdirSync(foldersPath);
+const foldersPath = path.join(__dirname, 'commands'); //__dirname é o caminho até a pasta onde está o arquivo que está rodando.
+
+const commandFolder = fs.readdirSync(foldersPath); //lê todos os arquivos e subpastas dentro da pasta 'commands' de forma sincronizada.
 
 for (const folder of commandFolder) {
     const commandsPath = path.join(foldersPath, folder);
@@ -27,7 +28,7 @@ for (const folder of commandFolder) {
         if ('data' in command && 'execute' in command) {
             client.commands.set(command.data.name, command);
         } else {
-            console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+            console.log(`[ATENÇÃO] O comando em ${filePath} está falatndo uma propriedade de "data" ou "execute".`);
         }
     }
 }
