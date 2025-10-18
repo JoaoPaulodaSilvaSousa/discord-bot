@@ -49,7 +49,7 @@ for (const file of eventFiles) {
 const jobs = require('./jobs');
 
 // Importa o módulo soma dos pacotes
-const SomaDosPacotes = require('./somadospacotes');
+const SomaDosPacotes = require('./SomaDosPacotes');
 
 // Espera o client estar pronto para agendar as tarefas
 client.once('ready', async () => {

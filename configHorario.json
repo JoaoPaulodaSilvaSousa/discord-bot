@@ -1,10 +1,10 @@
 {
   "PLACE": {
-    "corteHora": 14,
-    "corteMinuto": 0,
+    "corteHora": 22,
+    "corteMinuto": 59,
     "postagemHora": 14,
     "postagemMinuto": 0,
-    "atrasoMinutos": 10,
+    "atrasoMinutos": 0,
     "canalid": "1395521141371568301"
   },
   "SHOPEE_ENTREGA_DIRETA": {
