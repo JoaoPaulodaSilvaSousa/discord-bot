@@ -54,6 +54,12 @@ module.exports = async function SomaDosPacotes(client) {
         console.error('Erro emitido no client:', error);
     });
 
+    const pool = require('./db');
+
+    pool.getConnection()
+    .then(() => console.log('✅ Conectado ao MySQL com sucesso!'))
+    .catch(err =>console.error('❌ Erro ao conectar ao MySQL:', err))
+    
     async function processarMensagem(message) {
         if (message.author.bot) return;
 
@@ -112,6 +118,16 @@ module.exports = async function SomaDosPacotes(client) {
             console.log(`✅ Mensagem registrada: ${resposta}`);
         } catch (err) {
             console.warn('⚠️ Não foi possível reagir à mensagem:', err);
+        }
+
+        try {
+            await pool.query(
+                'INSERT INTO pacotes (titulo, total, partes, canal_id) VALUES (?, ?, ?, ?)',
+                [tituloOriginal, total, partes.join(', '), message.channel.id]
+            );
+            console.log(`💾 Dados salvos no banco: ${tituloOriginal} (${total})`)
+        } catch (err) {
+            console.error('❌ Erro ao salvar no banco:', err);
         }
     }
 
